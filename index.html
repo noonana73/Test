@@ -1,46 +1,86 @@
+client_handle_input = function() {
+    
+//....
 
-/* Socket.IO server set up. */
+            //Update what sequence we are on now
+        this.input_seq += 1;
 
-//Express and socket.io can work together to serve the socket.io client files for you.
-//This way, when the client requests '/socket.io/' files, socket.io determines what the client needs.
-        
-        //Create a socket.io instance using our express server
-    var sio = io.listen(app);
-
-        //Configure the socket.io connection settings. 
-        //See http://socket.io/
-    sio.configure(function (){
-
-        sio.set('log level', 0);
-
-        sio.set('authorization', function (handshakeData, callback) {
-          callback(null, true); // error first callback style 
+            //Store the input state as a snapshot of what happened.
+        this.players.self.inputs.push({
+            inputs : input,
+            time : this.local_time.fixed(3),
+            seq : this.input_seq
         });
 
-    });
+            //Send the packet of information to the server.
+            //The input packets are labelled with an 'i' in front.
+        var server_packet = 'i.';
+            server_packet += input.join('-') + '.';
+            server_packet += this.local_time.toFixed(3).replace('.','-') + '.';
+            server_packet += this.input_seq;
+            
+            //Go
+        this.socket.send(  server_packet  );
 
-        //Socket.io will call this function when a client connects, 
-        //So we can send that client a unique ID we use so we can 
-        //maintain the list of players.
-    sio.sockets.on('connection', function (client) {
-        
-            //Generate a new UUID, looks something like 
-            //5b2ca132-64bd-4513-99da-90e838ca47d1
-            //and store this on their socket/connection
-        client.userid = UUID();
+//....
 
-            //tell the player they connected, giving them their id
-        client.emit('onconnected', { id: client.userid } );
+}
 
-            //Useful to know when someone connects
-        console.log('\t socket.io:: player ' + client.userid + ' connected');
-        
-            //When this client disconnects
-        client.on('disconnect', function () {
 
-                //Useful to know when someone disconnects
-            console.log('\t socket.io:: client disconnected ' + client.userid );
+//In the update loop and when we recieve a message from the server
+//we immediately set the client position, as the server has final say,
+//but then we apply any input the server has not acknowledged yet, keeping our position consistent
 
-        }); //client.on disconnect
-     
-    }); //sio.sockets.on connection
+client_process_net_prediction_correction = function() {
+//....
+
+        //The most recent server update
+    var latest_server_data = this.server_updates[this.server_updates.length-1];
+
+    var my_last_input_on_server = this.players.self.host ? 
+                                    latest_server_data.his : 
+                                        latest_server_data.cis;
+
+        //If the server has sent us a 'host input sequence' or 'client input sequence' state 
+    if(my_last_input_on_server) {
+
+            //The last input sequence index in my local input list
+        var lastinputseq_index = -1;
+
+            //Find this input in the list, and store the index of that input
+        for(var i = 0; i < this.players.self.inputs.length; ++i) {
+
+            if(this.players.self.inputs[i].seq == my_last_input_on_server) {
+                lastinputseq_index = i;
+                break;
+            }
+
+        }
+
+            //Now we can crop the list of any updates we have already processed
+        if(lastinputseq_index != -1) {
+
+            //since we have now gotten an acknowledgement from the server that our inputs here have been accepted
+            //and we now predict from the last known position instead of wherever we were.
+
+                //remove the rest of the inputs we have confirmed on the server
+            var number_to_clear = Math.abs(lastinputseq_index + 1));
+                //Then clear the past ones out
+            this.players.self.inputs.splice(0, number_to_clear);
+
+                //The player is now located at the new server position, authoritive server
+            this.players.self.cur_state.pos = this.pos(my_server_pos);
+            this.players.self.last_input_seq = lastinputseq_index;
+            
+                //Now we reapply all the inputs that we have locally that
+                //the server hasn't yet confirmed. This will 'keep' our position the same,
+                //but also confirm the server position at the same time.
+            this.client_update_physics();
+            this.client_update_local_position();
+
+        } // if(lastinputseq_index != -1)
+    } //if my_last_input_on_server
+
+
+//....
+}
