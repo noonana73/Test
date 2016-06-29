@@ -7,12 +7,9 @@ var x = 20;
 var y = 70;
 setInterval(update,10);
 function update(){
-  x++;
+  x = x + 20;
+  ctx.fillRect(x,60,100,200);
 }
-ctx.fillRect(x,y,100,200);
-x = 200;
-y = 300;
-ctx.fillRect(x,y,100,200);
 
 
 </script>
