@@ -5,9 +5,9 @@ var canv = document.getElementById("ctx");
 var ctx = canv.getContext("2d");
 var x = 20;
 var y = 70;
-setInterval(update,10);
+setInterval(update,100);
 function update(){
-  x = x + 20;
+  x = x++;
   ctx.fillRect(x,60,100,200);
 }
 
