@@ -6,6 +6,7 @@ var ctx = canv.getContext("2d");
 var x = 0;
 setInterval(change,20);
 function change(){
+ ctx.clearRect(0,0,700,500);
  x++; 
  ctx.fillRect(x,250,50,50);
 }
